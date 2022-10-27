@@ -42,9 +42,11 @@ class CurrentStatement(models.AbstractModel):
                 THEN l.date
                 ELSE l.date_maturity
             END as date_maturity,
-            CASE WHEN coalesce(l.date_maturity,l.date)::date  < date_trunc('month', date %(date_end)s)::date 
+            CASE WHEN
+                coalesce(l.date_maturity,l.date)::date
+                    < date_trunc('month', date %(date_end)s)::date
                 THEN 0
-                ELSE 1 
+                ELSE 1
             END current_month
             FROM account_move_line l
             JOIN account_account aa ON (aa.id = l.account_id)

@@ -18,9 +18,7 @@ class TestCurrentStatement(TransactionCase):
 
         self.user = self._create_user("user_1", [self.g_account_user], self.company).id
 
-        self.statement_model = self.env[
-            "report.partner_statement.current_statement"
-        ]
+        self.statement_model = self.env["report.partner_statement.current_statement"]
         self.wiz = self.env["current.statement.wizard"]
         self.report_name = "partner_statement.current_statement"
         self.report_name_xlsx = "p_s.report_current_statement_xlsx"

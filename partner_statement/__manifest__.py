@@ -20,7 +20,6 @@
         "views/aging_buckets.xml",
         "views/res_config_settings.xml",
         "wizard/statement_wizard.xml",
-        
     ],
     "installable": True,
     "application": False,

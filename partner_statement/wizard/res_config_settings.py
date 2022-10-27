@@ -36,7 +36,7 @@ class ResConfigSettings(models.TransientModel):
         group="account.group_account_invoice",
         implied_group="partner_statement.group_outstanding_statement",
     )
-    
+
     group_current_statement = fields.Boolean(
         "Enable Current Statements",
         group="account.group_account_invoice",
