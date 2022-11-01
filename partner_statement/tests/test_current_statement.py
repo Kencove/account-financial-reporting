@@ -19,10 +19,18 @@ class TestCurrentStatement(TransactionCase):
         self.user = self._create_user("user_1", [self.g_account_user], self.company).id
 
         self.statement_model = self.env["report.partner_statement.current_statement"]
+        self.statement_xlsx_model = self.env["report.p_s.report_current_statement_xlsx"]
         self.wiz = self.env["current.statement.wizard"]
         self.report_name = "partner_statement.current_statement"
         self.report_name_xlsx = "p_s.report_current_statement_xlsx"
         self.report_title = "Current Statement"
+        self.date_end = "2022-09-30"
+        self.date_start = "2022-09-01"
+        self.account_type = "receivable"
+        self.show_aging_buckets = True
+        self.filter_partners_non_due = False
+        self.aging_type = "days"
+        self.filter_negative_balances = False
 
     def _create_user(self, login, groups, company):
         group_ids = [group.id for group in groups]
@@ -66,10 +74,13 @@ class TestCurrentStatement(TransactionCase):
                 "report_type": "xlsx",
             },
             statement_xlsx,
-            "There was an error and the PDF report was not generated.",
+            "There was an error and the XLSX report was not generated.",
         )
 
         data = wiz_id._prepare_statement()
+        self.assertIsInstance(
+            data, dict, "There is an error while preparing the statement"
+        )
         docids = data["partner_ids"]
         report = self.statement_model._get_report_values(docids, data)
         self.assertIsInstance(
@@ -87,4 +98,34 @@ class TestCurrentStatement(TransactionCase):
         )
         self.assertIn(
             "bucket_labels", report, "There was an error while compiling the report."
+        )
+
+    def test_customer_current_report_display_lines_sql_q1(self):
+        docids = [self.partner1.id]
+        query = self.statement_model._display_lines_sql_q1(
+            docids, self.date_end, self.account_type
+        )
+        self.assertIsInstance(
+            query, str, "There was an error while running _display_lines_sql_q1."
+        )
+
+    def test_customer_current_report_display_lines_sql_q2(self):
+        query = self.statement_model._display_lines_sql_q2()
+        self.assertIsInstance(
+            query, str, "There was an error while running _display_lines_sql_q2."
+        )
+
+    def test_customer_display_lines_sql_q3(self):
+        query = self.statement_model._display_lines_sql_q3(self.company.id)
+        self.assertIsInstance(
+            query, str, "There was an error while running _display_lines_sql_q3."
+        )
+
+    def test_get_account_display_lines(self):
+        docids = [self.partner1.id]
+        result = self.statement_model._get_account_display_lines(
+            self.company.id, docids, self.date_start, self.date_end, self.account_type
+        )
+        self.assertIsInstance(
+            result, dict, "There was an error while running _get_account_display_lines."
         )
