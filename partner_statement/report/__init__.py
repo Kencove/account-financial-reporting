@@ -3,3 +3,5 @@ from . import activity_statement
 from . import outstanding_statement
 from . import activity_statement_xlsx
 from . import outstanting_statement_xlsx
+from . import current_statement
+from . import current_statement_xlsx
