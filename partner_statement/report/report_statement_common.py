@@ -302,6 +302,7 @@ class ReportStatementCommon(models.AbstractModel):
                 "buckets": [],
                 "balance_forward": balance_forward,
                 "amount_due": amount_due,
+                "ending_balance": 0.0,
             },
             currencies,
         )
@@ -412,7 +413,7 @@ class ReportStatementCommon(models.AbstractModel):
         else:
             bucket_labels = {}
 
-        # organise and format for report
+        # organize and format for report
         format_date = self._format_date_to_partner_lang
         partners_to_remove = set()
         for partner_id in partner_ids:
@@ -473,6 +474,7 @@ class ReportStatementCommon(models.AbstractModel):
                 line_currency = currency_dict[line["currency_id"]]
                 if not line["blocked"]:
                     line_currency["amount_due"] += line[amount_field]
+                    line_currency["ending_balance"] = line_currency["amount_due"]
                 line["balance"] = line_currency["amount_due"]
                 line["date"] = format_date(
                     line["date"], date_formats.get(partner_id, default_fmt)
@@ -483,10 +485,11 @@ class ReportStatementCommon(models.AbstractModel):
                 line["reconciled_line"] = False
                 if is_detailed:
                     line["open_amount"] = 0.0
+                    line["applied_amount"] = 0.0
                 line_currency["lines"].extend(
                     self._add_currency_line(line, currencies[line["currency_id"]])
                 )
-                for line2 in reconciled_lines.get(partner_id, []):
+                for line2 in reconciled_lines:
                     if line2["id"] in line["ids"]:
                         line2["date"] = format_date(
                             line2["date"], date_formats.get(partner_id, default_fmt)
@@ -497,56 +500,35 @@ class ReportStatementCommon(models.AbstractModel):
                         )
                         line2["reconciled_line"] = True
                         line2["applied_amount"] = line2["open_amount"]
+                        line["applied_amount"] += line2["open_amount"]
                         line_currency["lines"].extend(
                             self._add_currency_reconciled_line(
                                 line2, currencies[line["currency_id"]]
                             )
                         )
+                if is_detailed:
+                    line["open_amount"] = line["amount"] + line["applied_amount"]
+
+            if is_detailed:
+                for line_currency in currency_dict.values():
+                    line_currency["amount_due"] = 0.0
 
             for line in ending_lines.get(partner_id, []):
                 line_currency = currency_dict[line["currency_id"]]
-                ending_balance = 0.0
-                for line2 in prior_lines.get(partner_id, []):
-                    if line["id"] == line2["id"]:
-                        if not line["blocked"]:
-                            ending_balance += line["open_amount"]
-                        line["balance"] = ending_balance
-                        line["date"] = format_date(
-                            line["date"], date_formats.get(partner_id, default_fmt)
-                        )
-                        line["date_maturity"] = format_date(
-                            line["date_maturity"],
-                            date_formats.get(partner_id, default_fmt),
-                        )
-                        line_currency["ending_lines"].extend(
-                            self._add_currency_ending_line(
-                                line, currencies[line["currency_id"]]
-                            )
-                        )
-            for line in ending_lines.get(partner_id, []):
-                line_currency = currency_dict[line["currency_id"]]
-                for line2 in lines.get(partner_id, []):
-                    if line2["reconciled_line"]:
-                        continue
-                    if line["id"] == line2["ids"][0]:
-                        same_lines = [
-                            ln
-                            for ln in ending_lines[partner_id]
-                            if ln["id"] in set(line2["ids"])
-                        ]
-                        line2["open_amount"] = sum(
-                            ln["open_amount"] for ln in same_lines
-                        )
-                        line_currency["ending_lines"].extend(
-                            self._add_currency_ending_line(
-                                line2, currencies[line["currency_id"]]
-                            )
-                        )
-            if is_detailed:
-                for line in lines[partner_id]:
-                    if line["reconciled_line"]:
-                        continue
-                    line["applied_amount"] = line["open_amount"] - line["amount"]
+                if not line["blocked"]:
+                    line_currency["amount_due"] += line["open_amount"]
+                line["balance"] = line_currency["amount_due"]
+                line["date"] = format_date(
+                    line["date"], date_formats.get(partner_id, default_fmt)
+                )
+                line["date_maturity"] = format_date(
+                    line["date_maturity"], date_formats.get(partner_id, default_fmt)
+                )
+                line_currency["ending_lines"].extend(
+                    self._add_currency_ending_line(
+                        line, currencies[line["currency_id"]]
+                    )
+                )
 
             if data["show_aging_buckets"]:
                 for line in buckets[partner_id]:

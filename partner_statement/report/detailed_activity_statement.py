@@ -86,7 +86,6 @@ class DetailedActivityStatement(models.AbstractModel):
     def _get_account_display_reconciled_lines(
         self, company_id, partner_ids, date_start, date_end, account_type
     ):
-        res = dict(map(lambda x: (x, []), partner_ids))
         partners = tuple(partner_ids)
 
         # pylint: disable=E8103
@@ -99,7 +98,8 @@ class DetailedActivityStatement(models.AbstractModel):
              Q5 AS (%s),
              Q6 AS (%s)
         SELECT partner_id, currency_id, move_id, date, date_maturity, debit,
-               credit, amount, open_amount, name, ref, blocked, id
+               credit, amount, open_amount, COALESCE(name, '') as name,
+               COALESCE(ref, '') as ref, blocked, id
         FROM Q6
         ORDER BY date, date_maturity, move_id"""
             % (
@@ -113,9 +113,7 @@ class DetailedActivityStatement(models.AbstractModel):
                 self._display_outstanding_lines_sql_q3("Q5", company_id),
             )
         )
-        for row in self.env.cr.dictfetchall():
-            res[row.pop("partner_id")].append(row)
-        return res
+        return self.env.cr.dictfetchall()
 
     def _get_account_display_ending_lines(
         self, company_id, partner_ids, date_start, date_end, account_type

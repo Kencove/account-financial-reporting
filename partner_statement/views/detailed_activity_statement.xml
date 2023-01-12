@@ -46,6 +46,7 @@
                             t-call="partner_statement.outstanding_balance"
                             name="prior_balance"
                         />
+                        <t t-set="ending_amount" t-value="currency['ending_balance']" />
                         <t
                             t-call="partner_statement.activity_balance"
                             name="detailed_activity"
