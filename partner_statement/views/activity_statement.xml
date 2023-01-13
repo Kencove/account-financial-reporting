@@ -17,11 +17,11 @@
                     <th>Reference number</th>
                     <th>Date</th>
                     <th>Description</th>
-                    <th class="amount"><span t-if="is_detailed">Original</span><span
-                            t-if="not is_detailed"
-                        >Amount</span></th>
-                    <th t-if="is_detailed">Applied Amount</th>
-                    <th t-if="is_detailed">Open Amount</th>
+                    <th class="amount"><span
+                            t-if="is_detailed"
+                        >Original </span>Amount</th>
+                    <th class="amount" t-if="is_detailed">Applied Amount</th>
+                    <th class="amount" t-if="is_detailed">Open Amount</th>
                     <th class="amount" t-if="show_balance">Balance</th>
                 </tr>
             </thead>
@@ -121,6 +121,12 @@
                         <span
                             t-esc="currency['amount_due']"
                             t-options="{'widget': 'monetary', 'display_currency': display_currency}"
+                            t-if="not show_balance"
+                        />
+                        <span
+                            t-esc="ending_amount"
+                            t-options="{'widget': 'monetary', 'display_currency': display_currency}"
+                            t-if="show_balance"
                         />
                     </td>
                 </tr>
@@ -160,6 +166,7 @@
                     <t t-foreach="d['currencies'].items()" t-as="currency">
                         <t t-set="display_currency" t-value="Currencies[currency[0]]" />
                         <t t-set="currency" t-value="currency[1]" />
+                        <t t-set="ending_amount" t-value="currency['ending_balance']" />
                         <t
                             t-call="partner_statement.activity_balance"
                             name="activity"

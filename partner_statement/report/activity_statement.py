@@ -17,40 +17,74 @@ class ActivityStatement(models.AbstractModel):
         return str(
             self._cr.mogrify(
                 """
-            SELECT l.partner_id, l.currency_id, l.company_id,
-            sum(CASE WHEN l.currency_id is not null AND l.amount_currency > 0.0
-                THEN l.amount_currency
-                ELSE l.debit
-            END) as debit,
-            sum(CASE WHEN l.currency_id is not null AND l.amount_currency < 0.0
-                THEN l.amount_currency * (-1)
-                ELSE l.credit
-            END) as credit
+            SELECT l.partner_id, l.currency_id, l.company_id, l.id,
+                CASE WHEN l.balance > 0.0
+                    THEN l.balance - sum(coalesce(pd.amount, 0.0))
+                    ELSE l.balance + sum(coalesce(pc.amount, 0.0))
+                END AS open_amount,
+                CASE WHEN l.balance > 0.0
+                    THEN l.amount_currency - sum(coalesce(pd.debit_amount_currency, 0.0))
+                    ELSE l.amount_currency + sum(coalesce(pc.credit_amount_currency, 0.0))
+                END AS open_amount_currency
             FROM account_move_line l
             JOIN account_account aa ON (aa.id = l.account_id)
             JOIN account_account_type at ON (at.id = aa.user_type_id)
             JOIN account_move m ON (l.move_id = m.id)
+            LEFT JOIN (SELECT pr.*
+                FROM account_partial_reconcile pr
+                INNER JOIN account_move_line l2
+                ON pr.credit_move_id = l2.id
+                WHERE l2.date < %(date_start)s
+            ) as pd ON pd.debit_move_id = l.id
+            LEFT JOIN (SELECT pr.*
+                FROM account_partial_reconcile pr
+                INNER JOIN account_move_line l2
+                ON pr.debit_move_id = l2.id
+                WHERE l2.date < %(date_start)s
+            ) as pc ON pc.credit_move_id = l.id
             WHERE l.partner_id IN %(partners)s
                 AND at.type = %(account_type)s
                 AND l.date < %(date_start)s AND not l.blocked
                 AND m.state IN ('posted')
-            GROUP BY l.partner_id, l.currency_id, l.company_id
+                AND (
+                    (pd.id IS NOT NULL AND
+                        pd.max_date < %(date_start)s) OR
+                    (pc.id IS NOT NULL AND
+                        pc.max_date < %(date_start)s) OR
+                    (pd.id IS NULL AND pc.id IS NULL)
+                )
+            GROUP BY l.partner_id, l.currency_id, l.company_id, l.balance, l.id
         """,
                 locals(),
             ),
             "utf-8",
         )
 
-    def _initial_balance_sql_q2(self, company_id):
+    def _initial_balance_sql_q2(self, sub):
         return str(
             self._cr.mogrify(
-                """
-            SELECT Q1.partner_id, debit-credit AS balance,
-            COALESCE(Q1.currency_id, c.currency_id) AS currency_id
-            FROM Q1
-            JOIN res_company c ON (c.id = Q1.company_id)
-            WHERE c.id = %(company_id)s
-        """,
+                f"""
+            SELECT {sub}.partner_id, {sub}.currency_id,
+                sum(CASE WHEN {sub}.currency_id is not null
+                    THEN {sub}.open_amount_currency
+                    ELSE {sub}.open_amount
+                END) as balance, {sub}.company_id
+            FROM {sub}
+            GROUP BY {sub}.partner_id, {sub}.currency_id, {sub}.company_id""",
+                locals(),
+            ),
+            "utf-8",
+        )
+
+    def _initial_balance_sql_q3(self, sub, company_id):
+        return str(
+            self._cr.mogrify(
+                f"""
+            SELECT {sub}.partner_id, {sub}.balance,
+                COALESCE({sub}.currency_id, c.currency_id) AS currency_id
+            FROM {sub}
+            JOIN res_company c ON (c.id = {sub}.company_id)
+            WHERE c.id = %(company_id)s""",
                 locals(),
             ),
             "utf-8",
@@ -63,12 +97,16 @@ class ActivityStatement(models.AbstractModel):
         partners = tuple(partner_ids)
         # pylint: disable=E8103
         self.env.cr.execute(
-            """WITH Q1 AS (%s), Q2 AS (%s)
-        SELECT partner_id, currency_id, balance
-        FROM Q2"""
+            """WITH Q1 AS (%s),
+                    Q2 AS (%s),
+                    Q3 AS (%s)
+        SELECT partner_id, currency_id, sum(balance) as balance
+        FROM Q2
+        GROUP BY partner_id, currency_id"""
             % (
                 self._initial_balance_sql_q1(partners, date_start, account_type),
-                self._initial_balance_sql_q2(company_id),
+                self._initial_balance_sql_q2("Q1"),
+                self._initial_balance_sql_q3("Q2", company_id),
             )
         )
         for row in self.env.cr.dictfetchall():
@@ -155,8 +193,9 @@ class ActivityStatement(models.AbstractModel):
             """
         WITH Q1 AS (%s),
              Q2 AS (%s)
-        SELECT partner_id, move_id, date, date_maturity, name, ref, debit,
-            ids, credit, amount, blocked, currency_id
+        SELECT partner_id, move_id, date, date_maturity, ids,
+            COALESCE(name, '') as name, COALESCE(ref, '') as ref,
+            debit, credit, amount, blocked, currency_id
         FROM Q2
         ORDER BY date, date_maturity, move_id"""
             % (

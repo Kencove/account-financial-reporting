@@ -112,7 +112,10 @@ class ActivityStatementXslx(models.AbstractModel):
             row_pos, 2, row_pos, 4, _("Ending Balance"), FORMATS["format_tcell_left"]
         )
         sheet.write(
-            row_pos, 6, currency_data.get("amount_due"), FORMATS["current_money_format"]
+            row_pos,
+            6,
+            currency_data.get("ending_balance"),
+            FORMATS["current_money_format"],
         )
         return row_pos
 
