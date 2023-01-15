@@ -66,7 +66,9 @@ class DetailedActivityStatementXslx(models.AbstractModel):
             _("Description"),
             FORMATS["format_theader_yellow_center"],
         )
-        sheet.write(row_pos, 4, _("Original"), FORMATS["format_theader_yellow_center"])
+        sheet.write(
+            row_pos, 4, _("Original Amount"), FORMATS["format_theader_yellow_center"]
+        )
         sheet.write(
             row_pos, 5, _("Applied Amount"), FORMATS["format_theader_yellow_center"]
         )
@@ -169,7 +171,9 @@ class DetailedActivityStatementXslx(models.AbstractModel):
         sheet.write(
             row_pos,
             7 if show_balance else 6,
-            currency_data.get("amount_due"),
+            currency_data.get("ending_balance")
+            if show_balance
+            else currency_data.get("amount_due"),
             FORMATS["current_money_format"],
         )
         return row_pos
@@ -281,7 +285,7 @@ class DetailedActivityStatementXslx(models.AbstractModel):
         sheet.write(
             row_pos,
             7 if show_balance else 6,
-            currency_data.get("amount_due"),
+            currency_data.get("balance_forward"),
             FORMATS["current_money_format"],
         )
         return row_pos
